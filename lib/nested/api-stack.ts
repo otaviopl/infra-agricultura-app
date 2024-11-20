@@ -55,6 +55,78 @@ export class APInestedStack extends NestedStack {
     // Rotas
     const weatherInfo = api.root.addResource("weather-info");
     addLambdaIntegration(weatherInfo, lambdas.getWeatherData);
+    
+    // Adicionando a rota /update-location
+    const updateLocation = api.root.addResource("update-location");
+    addLambdaIntegration(updateLocation, lambdas.putUserLocation);
+    
+    updateLocation.addMethod(
+      "GET",
+      new apigateway.LambdaIntegration(lambdas.getLocationByUser, {
+        proxy: false,
+        requestTemplates: {
+          "application/json": JSON.stringify({
+            queryStringParameters: {
+              username: "$input.params('username')",
+            },
+          }),
+        },
+        integrationResponses: [
+          {
+            statusCode: "200",
+            responseTemplates: {
+              "application/json": "$input.json('$')",
+            },
+            responseParameters: {
+              "method.response.header.Access-Control-Allow-Origin": "'*'",
+            },
+          },
+          {
+            statusCode: "400",
+            responseTemplates: {
+              "application/json": '{"message": "Erro no cliente"}',
+            },
+            responseParameters: {
+              "method.response.header.Access-Control-Allow-Origin": "'*'",
+            },
+          },
+          {
+            statusCode: "500",
+            responseTemplates: {
+              "application/json": '{"message": "Erro no servidor"}',
+            },
+            responseParameters: {
+              "method.response.header.Access-Control-Allow-Origin": "'*'",
+            },
+          },
+        ],
+      }),
+      {
+        requestParameters: {
+          "method.request.querystring.username": true, // Define o parâmetro 'username' como obrigatório
+        },
+        methodResponses: [
+          {
+            statusCode: "200",
+            responseParameters: {
+              "method.response.header.Access-Control-Allow-Origin": true,
+            },
+          },
+          {
+            statusCode: "400",
+            responseParameters: {
+              "method.response.header.Access-Control-Allow-Origin": true,
+            },
+          },
+          {
+            statusCode: "500",
+            responseParameters: {
+              "method.response.header.Access-Control-Allow-Origin": true,
+            },
+          },
+        ],
+      }
+    );    
 
     const userRegistration = api.root.addResource("register");
     addLambdaIntegration(userRegistration, lambdas.registerUser);
@@ -68,9 +140,13 @@ export class APInestedStack extends NestedStack {
 }
 
 // Função auxiliar para integrar Lambdas a rotas do API Gateway
-const addLambdaIntegration = (resource: apigateway.Resource, lambdaFunction: lambda.Function) => {
+const addLambdaIntegration = (
+  resource: apigateway.Resource,
+  lambdaFunction: lambda.Function,
+  method: string = "POST" // Define POST como padrão
+) => {
   resource.addMethod(
-    "POST",
+    method,
     new apigateway.LambdaIntegration(lambdaFunction, {
       proxy: false,
       integrationResponses: [
@@ -128,7 +204,6 @@ const addLambdaIntegration = (resource: apigateway.Resource, lambdaFunction: lam
   );
 };
 
-// Função para criar Lambdas
 const createLambdas = (
   usersTable: dynamodb.Table,
   sharedLayer: lambda.ILayerVersion,
@@ -148,6 +223,15 @@ const createLambdas = (
       effect: iam.Effect.ALLOW,
       actions: ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Query"],
       resources: [usersTable.tableArn],
+    })
+  );
+
+  // Permissão para acessar o parâmetro específico no SSM Parameter Store
+  lambdaRole.addToPolicy(
+    new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: ["ssm:GetParameter", "ssm:GetParameters"],
+      resources: ["arn:aws:ssm:us-east-1:060396677891:parameter/weather-api"],
     })
   );
 
@@ -181,6 +265,62 @@ const createLambdas = (
     layers: [sharedLayer],
   });
 
+  // Lambda para salvar localização do usuário
+  const putUserLocation = new lambda.Function(scope, "PutUserLocation", {
+    runtime: lambda.Runtime.NODEJS_18_X,
+    handler: "put-userLoc-dynamo.handler",
+    code: lambda.Code.fromAsset(path.join(__dirname, "../lambda")),
+    initialPolicy: [
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Scan",
+          "dynamodb:Query",
+        ],
+        resources: [usersTable.tableArn],
+      }),
+    ],
+    environment: {
+      TABLE_NAME: usersTable.tableName,
+    },
+    timeout: Duration.seconds(15),
+    memorySize: 256,
+    logRetention: logs.RetentionDays.ONE_WEEK,
+    role: lambdaRole,
+    layers: [sharedLayer],
+  });
+
+  const getLocationByUser = new lambda.Function(scope, "GetLocByUser", {
+    runtime: lambda.Runtime.NODEJS_18_X,
+    handler: "get-userLoc-dynamo.handler",
+    code: lambda.Code.fromAsset(path.join(__dirname, "../lambda")),
+    initialPolicy: [
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "dynamodb:GetItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Scan",
+          "dynamodb:Query",
+        ],
+        resources: [usersTable.tableArn],
+      }),
+    ],
+    environment: {
+      TABLE_NAME: usersTable.tableName,
+    },
+    timeout: Duration.seconds(15),
+    memorySize: 256,
+    logRetention: logs.RetentionDays.ONE_WEEK,
+    role: lambdaRole,
+    layers: [sharedLayer],
+  });
+
   // Lambda para login de usuários
   const loginUser = new lambda.Function(scope, "LoginUser", {
     runtime: lambda.Runtime.NODEJS_18_X,
@@ -196,5 +336,5 @@ const createLambdas = (
     layers: [sharedLayer],
   });
 
-  return { getWeatherData, registerUser, loginUser };
+  return { getWeatherData, registerUser, loginUser, putUserLocation, getLocationByUser };
 };
