@@ -29,7 +29,7 @@ export class APInestedStack extends NestedStack {
     const sharedLayer = lambda.LayerVersion.fromLayerVersionArn(
       this,
       "SharedLayer",
-      "arn:aws:lambda:us-east-1:060396677891:layer:nodejs-infra-agro:1"
+      "arn:aws:lambda:us-east-1:060396677891:layer:nodejs-infra-agro:2"
     );
 
     // Criação das Lambdas
