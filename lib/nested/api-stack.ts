@@ -55,7 +55,71 @@ export class APInestedStack extends NestedStack {
     // Rotas
     const weatherInfo = api.root.addResource("weather-info");
     addLambdaIntegration(weatherInfo, lambdas.getWeatherData);
-    
+
+    const alertsInfo = api.root.addResource("alerts-info");
+    alertsInfo.addMethod(
+      "GET",
+      new apigateway.LambdaIntegration(lambdas.alertsInfo, {
+        proxy: true, // Proxy direto para simplificar o repasse de parâmetros
+        integrationResponses: [
+          {
+            statusCode: "200",
+            responseTemplates: {
+              "application/json": "$input.json('$')", // Retorna o JSON completo da Lambda
+            },
+            responseParameters: {
+              "method.response.header.Access-Control-Allow-Origin": "'*'",
+            },
+          },
+          {
+            statusCode: "400",
+            responseTemplates: {
+              "application/json": '{"message": "Erro no cliente"}',
+            },
+            responseParameters: {
+              "method.response.header.Access-Control-Allow-Origin": "'*'",
+            },
+          },
+          {
+            statusCode: "500",
+            responseTemplates: {
+              "application/json": '{"message": "Erro no servidor"}',
+            },
+            responseParameters: {
+              "method.response.header.Access-Control-Allow-Origin": "'*'",
+            },
+          },
+        ],
+      }),
+      {
+        requestParameters: {
+          "method.request.querystring.longitude": true, // Parâmetro obrigatório
+          "method.request.querystring.latitude": true,  // Parâmetro obrigatório
+          "method.request.querystring.date": true,      // Parâmetro obrigatório
+        },
+        methodResponses: [
+          {
+            statusCode: "200",
+            responseParameters: {
+              "method.response.header.Access-Control-Allow-Origin": true,
+            },
+          },
+          {
+            statusCode: "400",
+            responseParameters: {
+              "method.response.header.Access-Control-Allow-Origin": true,
+            },
+          },
+          {
+            statusCode: "500",
+            responseParameters: {
+              "method.response.header.Access-Control-Allow-Origin": true,
+            },
+          },
+        ],
+      }
+    );    
+
     // Adicionando a rota /update-location
     const updateLocation = api.root.addResource("update-location");
     addLambdaIntegration(updateLocation, lambdas.putUserLocation);
@@ -231,7 +295,7 @@ const createLambdas = (
     new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: ["ssm:GetParameter", "ssm:GetParameters"],
-      resources: ["arn:aws:ssm:us-east-1:060396677891:parameter/weather-api"],
+      resources: ["arn:aws:ssm:us-east-1:060396677891:parameter/weather-api","arn:aws:ssm:us-east-1:060396677891:parameter/embrapa-api/token"]
     })
   );
 
@@ -249,6 +313,21 @@ const createLambdas = (
     role: lambdaRole,
     layers: [sharedLayer],
   });
+
+  const alertsInfo = new lambda.Function(scope, "alertData", {
+    runtime: lambda.Runtime.NODEJS_18_X,
+    handler: "get-alerts-infos.handler",
+    code: lambda.Code.fromAsset(path.join(__dirname, "../lambda")),
+    environment: {
+      TABLE_NAME: usersTable.tableName,
+    },
+    timeout: Duration.seconds(15),
+    memorySize: 256,
+    logRetention: logs.RetentionDays.ONE_WEEK,
+    role: lambdaRole,
+    layers: [sharedLayer],
+  });
+
 
   // Lambda para registrar usuários
   const registerUser = new lambda.Function(scope, "RegisterUser", {
@@ -336,5 +415,5 @@ const createLambdas = (
     layers: [sharedLayer],
   });
 
-  return { getWeatherData, registerUser, loginUser, putUserLocation, getLocationByUser };
+  return { getWeatherData, registerUser, loginUser, putUserLocation, getLocationByUser, alertsInfo};
 };
