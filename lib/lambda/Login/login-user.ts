@@ -13,6 +13,12 @@ export const handler = async (event: any) => {
     if (!username || !password) {
       return {
         statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "POST",
+          "Access-Control-Allow-Headers": "Content-Type",
+          "Access-Control-Allow-Credentials": true,
+        },
         body: JSON.stringify({ message: "Username e senha são obrigatórios." }),
       };
     }
@@ -32,6 +38,12 @@ export const handler = async (event: any) => {
     if (!user || !user.password || typeof user.password.S !== "string") {
       return {
         statusCode: 401,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "POST",
+          "Access-Control-Allow-Headers": "Content-Type",
+          "Access-Control-Allow-Credentials": true,
+        },
         body: JSON.stringify({ message: "Credenciais inválidas." }),
       };
     }
@@ -45,6 +57,12 @@ export const handler = async (event: any) => {
     if (!isPasswordValid) {
       return {
         statusCode: 401,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "POST",
+          "Access-Control-Allow-Headers": "Content-Type",
+          "Access-Control-Allow-Credentials": true,
+        },
         body: JSON.stringify({ message: "Credenciais inválidas." }),
       };
     }
@@ -58,6 +76,12 @@ export const handler = async (event: any) => {
 
     return {
       statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Credentials": true,
+      },
       body: JSON.stringify({ token }),
     };
   } catch (error) {
@@ -65,6 +89,12 @@ export const handler = async (event: any) => {
 
     return {
       statusCode: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Credentials": true,
+      },
       body: JSON.stringify({ message: "Erro ao realizar login." }),
     };
   }
