@@ -57,9 +57,69 @@ export class APInestedStack extends NestedStack {
     const weatherInfo = api.root.addResource("weather-info");
     addLambdaIntegration(weatherInfo, lambdas.getWeatherData);
 
-    // Rota: /alerts-info
     const alertsInfo = api.root.addResource("alerts-info");
-    addLambdaIntegration(alertsInfo, lambdas.alertsInfo, "GET");
+    alertsInfo.addMethod(
+      "GET",
+      new apigateway.LambdaIntegration(lambdas.alertsInfo, {
+        proxy: true, // Proxy direto para simplificar o repasse de parâmetros
+        integrationResponses: [
+          {
+            statusCode: "200",
+            responseTemplates: {
+              "application/json": "$input.json('$')", // Retorna o JSON completo da Lambda
+            },
+            responseParameters: {
+              "method.response.header.Access-Control-Allow-Origin": "'*'",
+            },
+          },
+          {
+            statusCode: "400",
+            responseTemplates: {
+              "application/json": '{"message": "Erro no cliente"}',
+            },
+            responseParameters: {
+              "method.response.header.Access-Control-Allow-Origin": "'*'",
+            },
+          },
+          {
+            statusCode: "500",
+            responseTemplates: {
+              "application/json": '{"message": "Erro no servidor"}',
+            },
+            responseParameters: {
+              "method.response.header.Access-Control-Allow-Origin": "'*'",
+            },
+          },
+        ],
+      }),
+      {
+        requestParameters: {
+          "method.request.querystring.longitude": true, // Parâmetro obrigatório
+          "method.request.querystring.latitude": true,  // Parâmetro obrigatório
+          "method.request.querystring.date": true,      // Parâmetro obrigatório
+        },
+        methodResponses: [
+          {
+            statusCode: "200",
+            responseParameters: {
+              "method.response.header.Access-Control-Allow-Origin": true,
+            },
+          },
+          {
+            statusCode: "400",
+            responseParameters: {
+              "method.response.header.Access-Control-Allow-Origin": true,
+            },
+          },
+          {
+            statusCode: "500",
+            responseParameters: {
+              "method.response.header.Access-Control-Allow-Origin": true,
+            },
+          },
+        ],
+      }
+    );  
 
     // Rota: /update-location
     const updateLocation = api.root.addResource("update-location");
@@ -437,6 +497,8 @@ const createLambdas = (
     handler: "chatgpt-lambda.handler",
     code: lambda.Code.fromAsset(path.join(__dirname, "../lambda/ChatGpt")),
     layers: [sharedLayer],
+    timeout: Duration.seconds(10),
+    memorySize: 512,
     role: lambdaRole,
 
   });
