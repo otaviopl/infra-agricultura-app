@@ -14,6 +14,7 @@ interface UserConditions {
 }
 export const handler = async (event: any) => {
   console.log("Lambda iniciou com o evento:", event); // Loga o evento recebido
+
   try {
     console.log("Iniciando recuperação da chave do SSM...");
     const parameter = await ssmClient.send(
@@ -33,6 +34,16 @@ export const handler = async (event: any) => {
     const body = JSON.parse(event.body);
     console.log("Payload recebido:", body);
 
+    // Extrair os valores de cada alerta do payload
+    const alerts = body.alerts;
+    const tmax2m = alerts.tmax2m.valor;
+    const tmin2m = alerts.tmin2m.valor;
+    const apcpsfc = alerts.apcpsfc.valor;
+    const gustsfc = alerts.gustsfc.valor;
+    const rh2m = alerts.rh2m.valor;
+    const sunsdsfc = alerts.sunsdsfc.valor;
+    const soill0_10cm = alerts.soill0_10cm.valor;
+
     const culturesList = body.cultures
       .map(
         (culture: any) =>
@@ -40,23 +51,25 @@ export const handler = async (event: any) => {
       )
       .join("\n");
 
+    console.log("Lista de culturas formatada:", culturesList);
+
     const prompt = `
     Dadas as condições climáticas fornecidas:
-    - Temperatura máxima: ${body.tmax2m}°C
-    - Temperatura mínima: ${body.tmin2m}°C
-    - Precipitação acumulada: ${body.apcpsfc} mm
-    - Velocidade do vento: ${body.gustsfc} m/s
-    - Umidade relativa: ${body.rh2m}%
-    - Radiação solar: ${body.sunsdsfc} W/m²
-    - Umidade do solo: ${body.soill0_10cm}%
+    - Temperatura máxima: ${tmax2m}°C
+    - Temperatura mínima: ${tmin2m}°C
+    - Precipitação acumulada: ${apcpsfc} mm
+    - Velocidade do vento: ${gustsfc} m/s
+    - Umidade relativa: ${rh2m}%
+    - Radiação solar: ${sunsdsfc} W/m²
+    - Umidade do solo: ${soill0_10cm}%
 
     E as seguintes culturas disponíveis:
     ${culturesList}
 
-    Por favor, forneça uma interpretação amigável para agricultores sobre como essas condições afetam o plantio e sugira quais dessas culturas seriam mais adequadas para plantar sob essas condições.
+    Por favor, forneça uma interpretação amigável para agricultores sobre como essas condições afetam o plantio e sugira quais dessas culturas seriam mais adequadas para plantar sob essas condições. Imagine que os agricultores vão usar suas dicas para plantar, e otimizar os processos deles! Use sua capaciade como IA para determinar previsões com base nos dados.
     `;
 
-console.log("Prompt para o ChatGPT:", prompt);
+    console.log("Prompt para o ChatGPT:", prompt);
 
     const response = await fetch(CHATGPT_API_URL, {
       method: "POST",
@@ -70,7 +83,7 @@ console.log("Prompt para o ChatGPT:", prompt);
           {
             role: "system",
             content:
-              "Você é um assistente agrícola. Com base nos meus dados de clima, quero detalhes sobre como plantar melhor.",
+              "Você é um assistente agrícola. Com base nos meus dados de clima, quero detalhes sobre como plantar melhor. Além disso seria interessante dicas detalhadas para eu ser um melhor agricultor.",
           },
           { role: "user", content: prompt },
         ],
@@ -99,3 +112,4 @@ console.log("Prompt para o ChatGPT:", prompt);
     };
   }
 };
+
