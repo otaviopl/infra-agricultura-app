@@ -66,7 +66,7 @@ export const handler = async (event: any) => {
     E as seguintes culturas disponíveis:
     ${culturesList}
 
-    Por favor, forneça uma interpretação amigável para agricultores sobre como essas condições afetam o plantio e sugira quais dessas culturas seriam mais adequadas para plantar sob essas condições. Imagine que os agricultores vão usar suas dicas para plantar, e otimizar os processos deles! Use sua capaciade como IA para determinar previsões com base nos dados.
+    Por favor, forneça uma interpretação amigável para agricultores sobre como essas condições afetam o plantio e sugira quais dessas culturas seriam mais adequadas para plantar sob essas condições. Imagine que os agricultores vão usar suas dicas para plantar, melhores periodos de colheita e plantio e otimizar os processos deles! Use sua capaciade como IA para determinar previsões com base nos dados.
     `;
 
     console.log("Prompt para o ChatGPT:", prompt);
@@ -83,7 +83,7 @@ export const handler = async (event: any) => {
           {
             role: "system",
             content:
-              "Você é um assistente agrícola. Com base nos meus dados de clima, quero detalhes sobre como plantar melhor. Além disso seria interessante dicas detalhadas para eu ser um melhor agricultor.",
+              "Você é um assistente agrícola. Com base nos meus dados de clima, quero detalhes sobre como plantar melhor. Além disso seria interessante dicas detalhadas para eu ser um melhor agricultor, dando previsoes climaticas, melhores periodos de colheita e plantio e me ajudando a entender como otimizar meu processo de plantio e colheita",
           },
           { role: "user", content: prompt },
         ],
