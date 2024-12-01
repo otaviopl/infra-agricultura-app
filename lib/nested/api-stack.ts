@@ -29,16 +29,15 @@ export class APInestedStack extends NestedStack {
     const sharedLayer = lambda.LayerVersion.fromLayerVersionArn(
       this,
       "SharedLayer",
-      "arn:aws:lambda:us-east-1:060396677891:layer:nodejs-infra-agro:2"
+      "arn:aws:lambda:us-east-1:060396677891:layer:nodejs-infra-agro:3"
     );
 
     // Criação das Lambdas
     const lambdas = createLambdas(usersTable, sharedLayer, this);
 
-    // Configuração do API Gateway
-    const api = new apigateway.RestApi(this, "AgrodataByLocation", {
-      restApiName: "AgrodataByLocation",
-      description: "API que retorna dados climáticos baseados na localização.",
+    const api = new apigateway.RestApi(this, "AgrodataAPI", {
+      restApiName: "Agrodata Service",
+      description: "API para dados climáticos e sugestões agrícolas.",
       deployOptions: {
         stageName: "dev",
         accessLogDestination: new apigateway.LogGroupLogDestination(apiLogGroup),
@@ -52,7 +51,9 @@ export class APInestedStack extends NestedStack {
       },
     });
 
-    // Rotas
+    // Definição das rotas da API
+
+    // Rota: /weather-info
     const weatherInfo = api.root.addResource("weather-info");
     addLambdaIntegration(weatherInfo, lambdas.getWeatherData);
 
@@ -118,12 +119,12 @@ export class APInestedStack extends NestedStack {
           },
         ],
       }
-    );    
+    );  
 
-    // Adicionando a rota /update-location
+    // Rota: /update-location
     const updateLocation = api.root.addResource("update-location");
-    addLambdaIntegration(updateLocation, lambdas.putUserLocation);
-    
+    addLambdaIntegration(updateLocation, lambdas.putUserLocation, "POST");
+
     updateLocation.addMethod(
       "GET",
       new apigateway.LambdaIntegration(lambdas.getLocationByUser, {
@@ -192,19 +193,93 @@ export class APInestedStack extends NestedStack {
       }
     );    
 
-    const userRegistration = api.root.addResource("register");
-    addLambdaIntegration(userRegistration, lambdas.registerUser);
+    // Rota: /interpret (ChatGPT)
+    const interpret = api.root.addResource("interpret");
+    addLambdaIntegration(interpret, lambdas.chatGptLambda, "POST");
 
-    const userLogin = api.root.addResource("login");
-    addLambdaIntegration(userLogin, lambdas.loginUser);
+    const cultures = api.root.addResource("cultures");
+    cultures.addMethod(
+  "GET",
+    new apigateway.LambdaIntegration(lambdas.culturesLambda, {
+      proxy: false, // Desativa o proxy
+      requestTemplates: {
+        "application/json": JSON.stringify({
+          // Template de mapeamento para a Lambda
+          method: "$context.httpMethod",
+          resourcePath: "$context.resourcePath",
+          queryParams: "$input.params().querystring",
+          headers: "$input.params().header",
+        }),
+      },
+      integrationResponses: [
+        {
+          statusCode: "200",
+          responseTemplates: {
+            "application/json": "$input.json('$')",
+          },
+          responseParameters: {
+            "method.response.header.Access-Control-Allow-Origin": "'*'",
+          },
+        },
+        {
+          statusCode: "400",
+          selectionPattern: ".*\\[400\\].*",
+          responseTemplates: {
+            "application/json": '{"message": "Erro no cliente"}',
+          },
+          responseParameters: {
+            "method.response.header.Access-Control-Allow-Origin": "'*'",
+          },
+        },
+        {
+          statusCode: "500",
+          selectionPattern: ".*\\[500\\].*",
+          responseTemplates: {
+            "application/json": '{"message": "Erro no servidor"}',
+          },
+          responseParameters: {
+            "method.response.header.Access-Control-Allow-Origin": "'*'",
+          },
+        },
+      ],
+    }),
+    {
+      methodResponses: [
+        {
+          statusCode: "200",
+          responseParameters: {
+            "method.response.header.Access-Control-Allow-Origin": true,
+          },
+        },
+        {
+          statusCode: "400",
+          responseParameters: {
+            "method.response.header.Access-Control-Allow-Origin": true,
+          },
+        },
+        {
+          statusCode: "500",
+          responseParameters: {
+            "method.response.header.Access-Control-Allow-Origin": true,
+          },
+        },
+      ],
+    }
+);
 
-    // Expondo as Lambdas para uso externo
+
+    // Rota: /register
+    const register = api.root.addResource("register");
+    addLambdaIntegration(register, lambdas.registerUser, "POST");
+
+    // Rota: /login
+    const login = api.root.addResource("login");
+    addLambdaIntegration(login, lambdas.loginUser, "POST");
+
+    // Expondo a função de dados climáticos para uso externo
     this.getWeatherData = lambdas.getWeatherData;
   }
-}
-
-// Função auxiliar para integrar Lambdas a rotas do API Gateway
-const addLambdaIntegration = (
+}const addLambdaIntegration = (
   resource: apigateway.Resource,
   lambdaFunction: lambda.Function,
   method: string = "POST" // Define POST como padrão
@@ -268,13 +343,14 @@ const addLambdaIntegration = (
   );
 };
 
+
 const createLambdas = (
   usersTable: dynamodb.Table,
   sharedLayer: lambda.ILayerVersion,
   scope: Construct
 ) => {
   // Role com permissões detalhadas
-  const lambdaRole = new iam.Role(scope, "LambdaExecutionRole", {
+  const lambdaRole = new iam.Role(scope, "LambdaExecutionRol", {
     assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
     managedPolicies: [
       iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole"),
@@ -295,7 +371,7 @@ const createLambdas = (
     new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: ["ssm:GetParameter", "ssm:GetParameters"],
-      resources: ["arn:aws:ssm:us-east-1:060396677891:parameter/weather-api","arn:aws:ssm:us-east-1:060396677891:parameter/embrapa-api/token"]
+      resources: ["arn:aws:ssm:us-east-1:060396677891:parameter/weather-api","arn:aws:ssm:us-east-1:060396677891:parameter/embrapa-api/token","arn:aws:ssm:us-east-1:060396677891:parameter/chatGpt/key"]
     })
   );
 
@@ -415,5 +491,42 @@ const createLambdas = (
     layers: [sharedLayer],
   });
 
-  return { getWeatherData, registerUser, loginUser, putUserLocation, getLocationByUser, alertsInfo};
+
+  const chatGptLambda = new lambda.Function(scope, "ChatGptLambda", {
+    runtime: lambda.Runtime.NODEJS_18_X,
+    handler: "chatgpt-lambda.handler",
+    code: lambda.Code.fromAsset(path.join(__dirname, "../lambda/ChatGpt")),
+    layers: [sharedLayer],
+    timeout: Duration.seconds(10),
+    memorySize: 512,
+    role: lambdaRole,
+
+  });
+
+  // Lambda para consulta de culturas
+  const culturesLambda = new lambda.Function(scope, "CulturesLambda", {
+    runtime: lambda.Runtime.NODEJS_18_X,
+    handler: "culture-lambda.handler",
+    code: lambda.Code.fromAsset(path.join(__dirname, "../lambda/ChatGpt")),
+    initialPolicy: [
+  new iam.PolicyStatement({
+    effect: iam.Effect.ALLOW,
+    actions: [
+      "ssm:GetParameter",
+      "ssm:GetParameters"
+    ],
+    resources: [
+      "arn:aws:ssm:us-east-1:060396677891:parameter/embrapa-api/token/key"
+    ],
+  }),
+],
+  
+    layers: [sharedLayer],
+    role: lambdaRole,
+
+
+  });
+
+
+  return { getWeatherData, registerUser, loginUser, putUserLocation, getLocationByUser, alertsInfo, chatGptLambda, culturesLambda};
 };
