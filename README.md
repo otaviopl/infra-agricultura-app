@@ -86,12 +86,7 @@ O **Agro Data** oferece uma experiência completa e inteligente para agricultore
 - **DynamoDB**: Suporta grande volume de usuários com latência mínima.
 - **GPT Integration**: Configurada para lidar com múltiplas requisições simultâneas.
 
----
-
-## 🌟 **Diferenciais**
-- **Resumos Inteligentes**: Simplificam a tomada de decisão do usuário.
-- **Automação Completa**: Da consulta climática à geração de insights personalizados.
-- **Foco na Experiência do Usuário**: Interface intuitiva e respostas rápidas.
+![image](https://github.com/user-attachments/assets/647a9ec1-1b81-47fa-a908-6bf413ef0fce)
 
 
 A infraestrutura robusta do **Agro Data** garante uma experiência confiável e inteligente, ajudando agricultores amadores a tomarem decisões baseadas em dados e insights gerados por IA. 🌿
